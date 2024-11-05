@@ -1,0 +1,5 @@
+
+PyQt5==5.15.7
+pandas==1.5.3
+reportlab==3.6.12
+sqlite3==3.34.1
