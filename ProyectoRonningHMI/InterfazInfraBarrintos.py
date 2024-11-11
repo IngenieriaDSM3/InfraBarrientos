@@ -10,8 +10,15 @@ from PyQt5.QtCore import Qt, QDate, QTimer, QThread, pyqtSlot, pyqtSignal
 from conversor import export_filtered_historial_to_pdf  # Actualiza con el nombre de tu módulo
 import io
 
+# Obtener el directorio base
+if getattr(sys, 'frozen', False):
+    # Si está empaquetado, usar sys._MEIPASS
+    base_path = sys._MEIPASS
+else:
+    # Si está en desarrollo, usar el directorio del archivo actual
+    base_path = os.path.dirname(__file__)
+
 class ConversionThread(QThread):
-    # Señal para emitir el resultado al final de la conversión
     resultado_signal = pyqtSignal(object)
 
     def __init__(self, archivo, start_date, end_date, cancel_flag):
@@ -19,65 +26,69 @@ class ConversionThread(QThread):
         self.archivo = archivo
         self.start_date = start_date
         self.end_date = end_date
-        self.cancel_flag = cancel_flag  # Guardar la referencia a la función de cancelación
-        self.cancelado = False  # Indicar si el proceso ha sido cancelado
+        self.cancel_flag = cancel_flag
+        self.cancelado = False
 
     def run(self):
         if not self.cancelado:
-            # Llamar a la función de exportación y pasar la función de cancelación
-            resultado = io.BytesIO(export_filtered_historial_to_pdf(self.archivo, self.start_date, self.end_date, cancel_flag=self.cancel_flag))
-            self.resultado_signal.emit(resultado)  # Emitir el resultado al finalizar
+            resultado = export_filtered_historial_to_pdf(self.archivo, self.start_date, self.end_date, cancel_flag=self.cancel_flag)
+            if isinstance(resultado, bytes):
+                 resultado = io.BytesIO(resultado)
+            self.resultado_signal.emit(resultado)
 
     def cancelar(self):
-        # Marcar el proceso como cancelado
         self.cancelado = True
 
 class SplashScreen(QWidget):
     def __init__(self):
         super().__init__()
         self.setFixedSize(850, 480)
-        self.setWindowFlags(Qt.FramelessWindowHint)  # Eliminar los bordes de la ventana
+        self.setWindowFlags(Qt.FramelessWindowHint)
 
-        # Configuración de la imagen de fondo para el splash screen
-        pixmap = QPixmap("figure/Open.jpg")  # Reemplazar con la ruta a la imagen de splash
+        # Cargar imagen usando base_path
+        splash_image_path = os.path.join(base_path, "figure", "Open.jpg")
+        pixmap = QPixmap(splash_image_path)
+        icon_path = os.path.join(base_path, "figure", "app-icon.png")
+        self.setWindowIcon(QIcon(icon_path))
         label = QLabel(self)
         label.setPixmap(pixmap)
-        label.setScaledContents(True)  # Ajustar la imagen al tamaño del QLabel
+        label.setScaledContents(True)
         label.setGeometry(0, 0, 850, 480)
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Registro de datos de pruebas en cilindro")
-        self.setFixedSize(850, 480)  # Establecer tamaño fijo de la ventana
-        self.setWindowIcon(QIcon("figure/app-icon.png"))  # Establecer ícono de la ventana
+        self.setFixedSize(850, 480)
+        
+        # Cargar ícono usando base_path
+        icon_path = os.path.join(base_path, "figure", "app-icon.png")
+        self.setWindowIcon(QIcon(icon_path))
 
-        self.thread_conversion = None  # Inicializar el hilo de conversión
+        self.thread_conversion = None
 
-        # Panel superior con título e imagen de fondo
         panel_superior = QLabel(self)
         panel_superior.setGeometry(0, 9, 850, 60)
-        panel_superior.setStyleSheet("background-color: #364E6C;")  # Color de fondo
+        panel_superior.setStyleSheet("background-color: #364E6C;")
 
-        # Etiqueta de título en el panel superior
         label_titulo = QLabel("Registro de datos de pruebas en cilindro", self)
         label_titulo.setFont(QFont("Calibri", 24, QFont.Bold))
         label_titulo.setStyleSheet("color: white;")
         label_titulo.setGeometry(126, 9, 600, 60)
         label_titulo.setAlignment(Qt.AlignCenter)
 
-        # Imagen del logo en el panel superior
         imagen_logo_infra = QLabel(self)
-        pixmap_logo = QPixmap("figure/logo-infra.png")  # Ruta a la imagen del logo
+        logo_infra_path = os.path.join(base_path, "figure", "logo-infra.png")
+        pixmap_logo = QPixmap(logo_infra_path)
         imagen_logo_infra.setPixmap(pixmap_logo)
         imagen_logo_infra.setGeometry(7, 17, 100, 45)
         imagen_logo_infra.setScaledContents(True)
 
-        # Sección de selección de archivo
         label_archivo = QLabel("Seleccione archivo fuente", self)
         font = QFont("Calibri", 14)
         font.setBold(True)
         font.setItalic(True)
+        label_archivo.setFont(font)
         label_archivo.setFont(font)
         label_archivo.setStyleSheet("color: #FF8300;")
         label_archivo.setGeometry(32, 92, 300, 30)
@@ -86,11 +97,12 @@ class MainWindow(QWidget):
         self.line_edit_archivo.setGeometry(107, 122, 600, 30)
         self.line_edit_archivo.setPlaceholderText("Ruta del archivo")
         self.line_edit_archivo.setStyleSheet("border: 1px solid #000000;")
-        self.line_edit_archivo.setReadOnly(True)  # Campo de solo lectura
+        self.line_edit_archivo.setReadOnly(True)
 
         btn_archivo = QPushButton(self)
+        icon_file_path = os.path.join(base_path, "figure", "ICONFILES.png")
+        btn_archivo.setIcon(QIcon(icon_file_path))
         btn_archivo.setGeometry(712, 122, 30, 30)
-        btn_archivo.setIcon(QIcon("figure/ICONFILES.png"))
         btn_archivo.clicked.connect(self.abrir_archivo)
 
         # Sección de selección de fechas
@@ -148,9 +160,10 @@ class MainWindow(QWidget):
         """)
         btn_exportar.clicked.connect(self.validar_datos)  # Conectar al método de validación
 
-        # Imagen del logo en el panel inferior
+        # Imagen en el panel inferior
         imagen_logo_caae = QLabel(self)
-        pixmap_logo = QPixmap("figure/LOGODSM3.jpeg")  # Ruta al logo
+        logo_caae_path = os.path.join(base_path, "figure", "LOGODSM3.jpeg")
+        pixmap_logo = QPixmap(logo_caae_path)
         imagen_logo_caae.setPixmap(pixmap_logo)
         imagen_logo_caae.setGeometry(790, 402, 60, 78)
         imagen_logo_caae.setScaledContents(True)
@@ -255,9 +268,10 @@ class MainWindow(QWidget):
         else:
             QMessageBox.critical(self, "Error", "Se produjo un error inesperado durante la conversión.")
 
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
     # Crear y mostrar el splash screen
     splash = SplashScreen()
     splash.show()
@@ -265,7 +279,7 @@ if __name__ == "__main__":
     # Crear una instancia de MainWindow
     main_window = MainWindow()
 
-    # Mostrar MainWindow después de cerrar el splash screen
+    # Mostrar MainWindow después de que el splash screen se cierre
     QTimer.singleShot(3000, splash.close)
     QTimer.singleShot(3000, main_window.show)
 

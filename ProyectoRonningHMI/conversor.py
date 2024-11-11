@@ -6,16 +6,20 @@ import re
 from io import BytesIO
 
 def estructurar_datos(df):
+    # Hacer una copia explícita del DataFrame original para evitar SettingWithCopyWarning
+    df = df.copy()
+    
     # Generar la columna "No." con asterisco si la columna "PATRON" es 1
     df.insert(0, "No.", range(1, len(df) + 1))  # Insertar la columna "No." al inicio
-    df['No.'] = df.apply(lambda x: f"{x['No.']}*" if x['PATRON'] == 1 else str(x['No.']), axis=1)
+    df['No.'] = df['No.'].astype(str)  # Convertir "No." a str
+    df.loc[:, 'No.'] = df.apply(lambda x: f"{x['No.']}*" if x['PATRON'] == 1 else x['No.'], axis=1)
 
     # Formatear la fecha al formato DD/MM/YYYY
-    df['Fecha'] = pd.to_datetime(df['Fecha'], format='%d-%m-%y', errors='coerce').dt.strftime('%d/%m/%Y')
+    df.loc[:, 'Fecha'] = pd.to_datetime(df['Fecha'], format='%d-%m-%y', errors='coerce').dt.strftime('%d/%m/%Y')
 
     # Crear la columna "Fallas" con los nombres de columnas concatenados que tengan "Si"
-    columnas_fallas = ['AB', 'PE', 'NC', 'IP', 'EP', 'BT', 'AP', 'FD', 'DG', 'OTHER']
-    df['Fallas'] = df[columnas_fallas].apply(lambda x: ' '.join(x.index[x == "Si"]), axis=1)
+    columnas_fallas = ["WNPH", "ASN", "IntCor", "ExtCor", "AB", "NC", "IP", "EP", "AP", "FD", "DG", "Otro"]
+    df.loc[:, 'Fallas'] = df[columnas_fallas].apply(lambda x: ' '.join(x.index[x == "Si"]), axis=1)
 
     # Función para agregar saltos de línea en el espacio más cercano cada 20 caracteres
     def agregar_saltos_linea(texto, max_length=20):
@@ -26,7 +30,7 @@ def estructurar_datos(df):
             return texto
 
     # Aplicar la función para dividir el texto en la columna "Fallas"
-    df['Fallas'] = df['Fallas'].apply(lambda x: agregar_saltos_linea(x))
+    df.loc[:, 'Fallas'] = df['Fallas'].apply(lambda x: agregar_saltos_linea(x))
 
     # Seleccionar y reordenar las columnas en el orden adecuado para el reporte
     columnas_finales = [
@@ -62,8 +66,8 @@ def export_filtered_historial_to_pdf(db_file, start_date, end_date, cancel_flag=
         # Leer la tabla "Historial" en un DataFrame de Pandas
         query = """
         SELECT Fecha, Codigo, Prueba, Operador, Tiempo, SN, GasSVC, Fabricante, FechaFab,
-               Cliente, Dimension, PObjetivo, PPico, PPromedio, TiempoEspera, Disposicion,
-               AB, PE, NC, IP, EP, BT, AP, FD, DG, OTHER, PATRON
+               Cliente, Dimension, PObjetivo, PPico, PPromedio, TiempoEspera, Disposicion, WNPH,	
+               ASN,	IntCor,	ExtCor,	AB,	NC,	IP,	EP,	AP,	FD,	DG,	Otro, PATRON
         FROM 'Historial' WHERE Fecha != '';
         """
         df = pd.read_sql_query(query, conn)
@@ -82,7 +86,7 @@ def export_filtered_historial_to_pdf(db_file, start_date, end_date, cancel_flag=
             print("No existe información en el archivo de la base de datos.")
             return 2  # Código de retorno para indicar que no hay información
 
-        # Convertir las fechas al formato YYYYMMDD en Python
+        # Convertir las fechas al formato YYYYMMDD 
         df['Fecha_convertida'] = pd.to_datetime(df['Fecha'], format='%d-%m-%y', errors='coerce').dt.strftime('%Y%m%d')
 
         # Verificar si la conversión de fechas ha fallado
